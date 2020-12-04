@@ -1,0 +1,8 @@
+{
+    "files.associations": {
+        "led.h": "c"
+        
+    },
+    "code-runner.runInTerminal": true,
+    "C_Cpp.errorSquiggles": "Disabled",
+}
