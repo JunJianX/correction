@@ -60,11 +60,13 @@ void TIM4_IRQHandler(void) //TIM3ÖÐ¶Ï
 			GPB7 = 0;
 		}
 		
-		if (old_direction != direction)
-		{
-			old_direction = direction;
-			shutdown_flag = 0;
-		}
+		// if (old_direction != direction)
+		// {
+		// 	old_direction = direction;
+		// 	// shutdown_flag = 0;
+		// }
+		if(!enable)
+			return ;
 		if (shutdown_flag == 0)
 		{
 			GPB8 = 1 - GPB8;

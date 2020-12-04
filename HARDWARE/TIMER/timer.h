@@ -28,6 +28,8 @@ enum NEXT_MOTOR_STATUS{
 #define REVERSE_TRANSFER 15 //·´×ªÈ¦Êý
 #define DISPLAY_BUF_SIZE 20
 
+#define RANK_MAX 3
+#define RANK_MIN 1
 void TIM3_Int_Init(u16 arr,u16 psc);
 void TIM4_Int_Init(u16 arr,u16 psc);
 void TIM3_PWM_Init(u16 arr,u16 psc);

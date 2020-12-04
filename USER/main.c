@@ -11,12 +11,16 @@
 #include "adc.h"
 #include "oled.h"
 
-#define IN1 GPIO_ReadInputDataBit(GPIOB, GPIO_Pin_3)
-#define IN2 GPIO_ReadInputDataBit(GPIOB, GPIO_Pin_6)
-#define IN3 GPIO_ReadInputDataBit(GPIOB, GPIO_Pin_9)
-#define IN4 GPIO_ReadInputDataBit(GPIOB, GPIO_Pin_10)
-#define IN5 GPIO_ReadInputDataBit(GPIOB, GPIO_Pin_11)
-#define IN6 GPIO_ReadInputDataBit(GPIOB, GPIO_Pin_12)
+#define IN1 GPIO_ReadInputDataBit(GPIOB, GPIO_Pin_6)
+#define IN2 GPIO_ReadInputDataBit(GPIOB, GPIO_Pin_9)
+#define IN3 GPIO_ReadInputDataBit(GPIOB, GPIO_Pin_10)
+#define IN4 GPIO_ReadInputDataBit(GPIOB, GPIO_Pin_11)
+#define IN5 GPIO_ReadInputDataBit(GPIOB, GPIO_Pin_12)
+#define IN6 GPIO_ReadInputDataBit(GPIOB, GPIO_Pin_14)
+
+#define UP GPIO_ReadInputDataBit(GPIOA, GPIO_Pin_1)
+#define DN GPIO_ReadInputDataBit(GPIOA, GPIO_Pin_2)
+#define SS GPIO_ReadInputDataBit(GPIOA, GPIO_Pin_3)
 
 /************************************************
  PA1--ADC1
@@ -101,6 +105,8 @@ int old_rpm = 0;
 int rotate_total = 0; //大于0正转，小于0反转
 int enable = 0;
 uint16_t direction = 1;
+uint16_t pre_direction0 = 0;
+uint16_t pre_direction1 = 0;
 uint16_t old_direction = 1;
 uint16_t mode = 1;
 uint16_t reset_position_flag = 0;
@@ -289,7 +295,7 @@ void process(void)
 		}
 	}
 
-	printf("-------------\n%s\n old_dir:%d\n-------------\n", rec_buff,old_direction);
+	printf("-------------\n%s\n old_dir:%d\n-------------\n", rec_buff, old_direction);
 	memset(rec_buff, 0, 128);
 	if (items != NULL)
 	{
@@ -319,28 +325,28 @@ void display(uint8_t mode_d)
 	if (mode_d == 0)
 	{
 		memset(display_buffer, 0, DISPLAY_BUF_SIZE);
-		sprintf(display_buffer, "en   :%d dir:%d", enable, direction);
+		sprintf(display_buffer, "en  :%d dir:%d", enable, direction);
 		// OLED_ShowString(0, 0, "                ", 16);
 		OLED_ShowString(0, 0, display_buffer, 16);
 
 		memset(display_buffer, 0, DISPLAY_BUF_SIZE);
-		sprintf(display_buffer, "rank :%d mode:%d", spd_index, mode);
+		sprintf(display_buffer, "rank:%d mode:%d", spd_index, mode);
 		OLED_ShowString(0, 2, display_buffer, 16);
 
 		memset(display_buffer, 0, DISPLAY_BUF_SIZE);
-		sprintf(display_buffer, "%d", pulse_count);
+		sprintf(display_buffer, "%05d", pulse_count);
 		OLED_ShowString(0, 4, display_buffer, 16);
 
 		memset(display_buffer, 0, DISPLAY_BUF_SIZE);
-		sprintf(display_buffer, "%d", old_direction/*spd_km_h_rank*/);
-		OLED_ShowString(56+16, 4, display_buffer, 16);
+		sprintf(display_buffer, "%d", old_direction /*spd_km_h_rank*/);
+		OLED_ShowString(56 + 16, 4, display_buffer, 16);
 
 		memset(display_buffer, 0, DISPLAY_BUF_SIZE);
 		sprintf(display_buffer, "shut:%d", shutdown_flag);
 		OLED_ShowString(0, 6, display_buffer, 16);
 
 		memset(display_buffer, 0, DISPLAY_BUF_SIZE);
-		sprintf(display_buffer, " %d%d%d%d%d%d", IN1,IN2,IN3,IN4,IN5,IN6);
+		sprintf(display_buffer, " %d%d%d%d%d%d", IN1, IN2, IN3, IN4, IN5, IN6);
 		OLED_ShowString(64, 6, display_buffer, 16);
 	}
 	else if (mode_d == 1)
@@ -353,16 +359,52 @@ void display(uint8_t mode_d)
 		OLED_ShowString(0, 0, display_buffer, 16);
 	}
 }
+
+void read_keys(void)
+{
+	if (SS == 0)
+	{
+		enable = 1-enable;
+	}
+
+	if (UP == 0)
+	{
+		if(spd_index<3)
+			spd_index++;
+
+	}
+
+	if (DN == 0)
+	{
+		if(spd_index>=2)
+			spd_index--;
+	}
+}
 void direction_contorl(void)
 {
 	if (IN1 == 1) //根据实际调整方向
 	{
-		direction = 1;
+		// direction = 1;
+		pre_direction1 = 1;
 	}
 
 	if (IN6 == 1)
 	{
+		// direction = 0;
+		pre_direction0 = 1;
+	}
+
+	if (!IN1 && pre_direction1)
+	{
+		direction = 1;
+		pre_direction1 = 0;
+	}
+
+	if (!IN6 && pre_direction0)
+	{
+
 		direction = 0;
+		pre_direction0 = 0;
 	}
 }
 int main(void)
@@ -397,11 +439,11 @@ int main(void)
 	// direction = (datatemp[0] << 8) + datatemp[1];
 	// printf("Read from flash  { direction }:%d\n", direction);
 	TIM4_Int_Init(9000, 0);
-	if (direction > 0)
-	{
-		count_times = 0;
-		enable = 1;
-	}
+	// if (direction > 0)
+	// {
+	// 	count_times = 0;
+	// 	enable = 1;
+	// }
 	/*
 		圈数计算清零
 		位置存储
@@ -423,8 +465,10 @@ int main(void)
 	while (1)
 	{
 		process();
+		read_keys();
 		display(0);
-		// direction_contorl();
+		
+		direction_contorl();
 		switch (mode)
 		{
 		case 1: //指定转速运行
@@ -451,11 +495,15 @@ int main(void)
 		// {
 		// 	shutdown_flag = 1; //根据实际调整方向
 		// 	// direction = 0;
-		// 	if(direction!=old_direction)
-		// 	{
-		// 		old_direction = direction;
-		// 		shutdown_flag = 0;
-		// 	}
+		if(pulse_count > EVOLUTION * NORMAL_TRANSFER)
+			 pulse_count = EVOLUTION * NORMAL_TRANSFER;
+		if(pulse_count < 0)
+			 pulse_count = 0;
+		if (direction != old_direction)
+		{
+			old_direction = direction;
+			shutdown_flag = 0;
+		}
 		// }
 		if (ABS(last_pulse_count, pulse_count) >= 1000)
 		{
@@ -464,13 +512,13 @@ int main(void)
 			last_pulse_count = pulse_count;
 			printf("write to simulate flash:%d\n", last_pulse_count);
 		}
-
+		read_keys();
 		if (spd_km_h_rank != spd_km_h_rank_old)
 		{
 			TIM_SetAutoreload(TIM4, spd_km_h_rank);
 			spd_km_h_rank_old = spd_km_h_rank;
 		}
-
+		read_keys();
 		i++;
 		if (i > 800)
 		{
